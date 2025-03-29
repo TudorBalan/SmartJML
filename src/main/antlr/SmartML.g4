@@ -2,7 +2,7 @@
 grammar SmartML;
 
 @header {
-    package athene.sclang.parser;
+    package parser;
 }
 
 /*------------------------------------------------------------------
@@ -81,7 +81,7 @@ exceptionDec
  *------------------------------------------------------------------*/
 
 resourceDec
-    : RESOURCE ID CLPAR (field)* constructor (function)* CRPAR
+    : RESOURCE id CLPAR (field)* constructor (function)* CRPAR
     ;
 
 /*------------------------------------------------------------------
