@@ -1,19 +1,21 @@
-import com.github.javaparser.ast.CompilationUnit;
+import parser.*;
+
 import com.github.javaparser.ast.Node;
-import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
+
 import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.tree.*;
+
 import java.io.IOException;
 import java.nio.file.*;
-import parser.*;
+
+
 
 public class Main {
 
     public static void main(String[] args) {
         try {
-            CharStream input = CharStreams.fromFileName("src/main/java/testInput.sl");
+            CharStream input = CharStreams.fromFileName("src/main/input/testInput.sl");
             System.out.println("INPUT:\n" + input);
-
             SmartMLLexer lexer = new SmartMLLexer(input);
             CommonTokenStream tokens = new CommonTokenStream(lexer);
             SmartMLParser parser = new SmartMLParser(tokens);
@@ -21,7 +23,7 @@ public class Main {
             System.out.println("SmartML AST:\n" + tree.toStringTree(parser));
             TranslationVisitor visitor = new TranslationVisitor();
             Node translation = visitor.visit(tree);
-            Files.write(Paths.get("src/main/java/testoutput.sl"), translation.toString().getBytes());
+            Files.write(Paths.get("src/main/output/testOutput.java"), translation.toString().getBytes());
 
         } catch (IOException e) {
             System.out.println("ERROR while processing file:" + e.getMessage());
