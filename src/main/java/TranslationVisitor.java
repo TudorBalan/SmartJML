@@ -1,3 +1,6 @@
+import com.github.javaparser.ast.stmt.BlockStmt;
+import com.github.javaparser.ast.stmt.ExpressionStmt;
+import com.github.javaparser.ast.stmt.Statement;
 import parser.*;
 
 import com.github.javaparser.ast.type.*;
@@ -5,11 +8,15 @@ import com.github.javaparser.ast.body.*;
 import com.github.javaparser.ast.expr.*;
 import com.github.javaparser.ast.*;
 
+import java.util.List;
 import java.util.stream.Collectors;
 
 
 
 public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
+
+    String constructorName;
+    boolean privateConstructor;
 
     /*------------------------------------------------------------------
      * PROGRAMS
@@ -32,7 +39,7 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
      *------------------------------------------------------------------*/
     @Override
     public Node visitDatatypeDec(SmartMLParser.DatatypeDecContext ctx){
-        //Datatype declarations are always final
+        //Class modifiers
         NodeList<Modifier> modifiers = new NodeList<>();
         modifiers.add(Modifier.finalModifier());
 
@@ -41,21 +48,7 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
 
         ClassOrInterfaceDeclaration datatypes = new ClassOrInterfaceDeclaration(modifiers, false, name);
 
-        /*
-        //Idea for Implementation of datatype fields:
-        modifiers.remove(Modifier.finalModifier());
-        ctx.dataTypeConstr().typeParams().forEach(x -> {
-            VariableDeclarator vars = (VariableDeclarator) this.visit(x);
-            datatypes.addMember(new FieldDeclaration(modifiers, vars));
-        });
-        */
-
         return datatypes;
-    }
-
-    @Override
-    public Node visitDataTypeConstr(SmartMLParser.DataTypeConstrContext ctx) {
-        return visitChildren(ctx);
     }
 
     /*------------------------------------------------------------------
@@ -63,18 +56,24 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
      *------------------------------------------------------------------*/
     @Override
     public Node visitResourceDec(SmartMLParser.ResourceDecContext ctx) {
-        //No modifiers
+        //Class modifiers
         NodeList<Modifier> modifiers = new NodeList<>();
 
         //The name is changed to SL_"name"
         String name = "SL_" + ((SimpleName) this.visit(ctx.id())).asString();
+        constructorName = name;
 
         ClassOrInterfaceDeclaration resources = new ClassOrInterfaceDeclaration(modifiers, false, name);
 
+        //Fields
         ctx.field().forEach(x -> {
             VariableDeclarator vars = (VariableDeclarator) this.visit(x);
             resources.addMember(new FieldDeclaration(modifiers, vars));
         });
+
+        //Constructor
+        privateConstructor = true;
+        resources.addMember((ConstructorDeclaration) this.visit(ctx.constructor()));
 
         return resources;
     }
@@ -84,31 +83,75 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
      *------------------------------------------------------------------*/
     @Override
     public Node visitContractDec(SmartMLParser.ContractDecContext ctx) {
-        //No modifiers
+        //Class modifiers
         NodeList<Modifier> modifiers = new NodeList<>();
 
         //The name is changed to SL_"name"
         String name = "SL_" + ((SimpleName) this.visit(ctx.contractId)).asString();
+        constructorName = name;
 
         ClassOrInterfaceDeclaration contracts = new ClassOrInterfaceDeclaration(modifiers, false, name);
 
+        //Fields
         ctx.body().field().forEach(x -> {
             VariableDeclarator vars = (VariableDeclarator) this.visit(x);
             contracts.addMember(new FieldDeclaration(modifiers, vars));
         });
 
+        //Constructor
+        privateConstructor = false;
+        contracts.addMember((ConstructorDeclaration) this.visit(ctx.body().constructor()));
+
         return contracts;
     }
+
+
+    @Override
+    public Node visitConstructor(SmartMLParser.ConstructorContext ctx) {
+        //Constructor Declaration
+        NodeList<Modifier> modifiers = new NodeList<>();
+        if (privateConstructor) modifiers.add(Modifier.privateModifier()); else modifiers.add(Modifier.publicModifier());
+        ConstructorDeclaration constructor = new ConstructorDeclaration(modifiers, constructorName);
+
+        //Parameters
+        NodeList<Parameter> parameters= new NodeList<>();
+        ctx.varParams.forEach(x -> parameters.add(new Parameter((Type) this.visit(x.type()), this.visit(x.id()).toString())));
+        constructor.setParameters(parameters);
+
+        //Body
+        BlockStmt body = new BlockStmt();
+        ctx.assign().forEach(x -> {
+            AssignExpr expr = (AssignExpr) this.visit(x);
+            body.addStatement(new ExpressionStmt(expr));
+        });
+        constructor.setBody(body);
+
+        return constructor;
+    }
+
 
     @Override
     public Node visitTypeParams(SmartMLParser.TypeParamsContext ctx) {
         //TODO add datatype call possibility
-        return new VariableDeclarator((Type) this.visit(ctx.type()), (this.visit(ctx.id())).toString());
+        return new Parameter((Type) this.visit(ctx.type()), (this.visit(ctx.id())).toString());
     }
 
     @Override
     public Node visitField(SmartMLParser.FieldContext ctx) {
         return new VariableDeclarator((Type) this.visit(ctx.type()), (this.visit(ctx.id())).toString());
+    }
+
+    @Override
+    public Node visitAssign(SmartMLParser.AssignContext ctx) {
+        return new AssignExpr(new NameExpr(this.visit(ctx.vardec().id()).toString()), new NameExpr(this.visit(ctx.expr().left.left.left.id()).toString()), AssignExpr.Operator.ASSIGN);
+    }
+
+    @Override
+    public Node visitVardec(SmartMLParser.VardecContext ctx) {
+        if (ctx.type() != null)
+            return new VariableDeclarator((Type) this.visit(ctx.type()), (this.visit(ctx.id())).toString());
+        else
+            return new NameExpr((SimpleName) visit(ctx.id()));
     }
 
     @Override
