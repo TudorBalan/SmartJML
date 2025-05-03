@@ -75,6 +75,9 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
         privateConstructor = true;
         resources.addMember((ConstructorDeclaration) this.visit(ctx.constructor()));
 
+        //Functions
+        ctx.function().forEach(x -> {resources.addMember((MethodDeclaration) this.visit(x));});
+
         return resources;
     }
 
@@ -132,13 +135,40 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
 
     @Override
     public Node visitTypeParams(SmartMLParser.TypeParamsContext ctx) {
-        //TODO add datatype call possibility
         return new Parameter((Type) this.visit(ctx.type()), (this.visit(ctx.id())).toString());
     }
 
     @Override
     public Node visitField(SmartMLParser.FieldContext ctx) {
         return new VariableDeclarator((Type) this.visit(ctx.type()), (this.visit(ctx.id())).toString());
+    }
+
+    @Override
+    public Node visitFunctionDec(SmartMLParser.FunctionDecContext ctx) {
+        //Modifiers
+        NodeList<Modifier> modifiers = new NodeList<>();
+        modifiers.add(Modifier.publicModifier());
+
+        //Return Type
+        Type returnType;
+        if (ctx.returnType() != null) {
+            returnType = (Type) this.visit(ctx.returnType());
+        } else {
+            returnType = new VoidType();
+        }
+        //Name
+        String name = this.visit(ctx.id()).toString();
+
+        //Parameters
+        NodeList<Parameter> params = new NodeList<>();
+        ctx.vardec().forEach(x -> params.add(new Parameter((Type) this.visit(x.type()), this.visit(x.id()).toString())));
+
+        return new MethodDeclaration(modifiers, name, returnType, params);
+    }
+
+    @Override
+    public Node visitFunction(SmartMLParser.FunctionContext ctx) {
+        return this.visit(ctx.functionDec());
     }
 
     @Override
@@ -160,10 +190,23 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
     }
 
     @Override
+    public Node visitReturnType(SmartMLParser.ReturnTypeContext ctx) {
+        switch (ctx.getText()) {
+            case "bool":
+                return PrimitiveType.booleanType();
+            case "string":
+                return new ClassOrInterfaceType(null, "String");
+            case "int":
+                return PrimitiveType.intType();
+            default:
+                return new VoidType();
+        }
+    }
+
+    @Override
     public Node visitType(SmartMLParser.TypeContext ctx) {
         switch (ctx.getText()) {
             case "address":
-                //TODO: Write address Class and add other types
                 return new ClassOrInterfaceType(null, "Address");
             case "bool":
                 return PrimitiveType.booleanType();
@@ -172,7 +215,7 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
             case "int":
                 return PrimitiveType.intType();
             default:
-                return new ClassOrInterfaceType(null, "ERROR_TYPE");
+                return new ClassOrInterfaceType(null, "SL_" + ctx.getText());
         }
     }
 
