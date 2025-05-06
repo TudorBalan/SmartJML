@@ -76,7 +76,7 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
         resources.addMember((ConstructorDeclaration) this.visit(ctx.constructor()));
 
         //Functions
-        ctx.function().forEach(x -> {resources.addMember((MethodDeclaration) this.visit(x));});
+        ctx.function().forEach(x -> resources.addMember((MethodDeclaration) this.visit(x)));
 
         return resources;
     }
@@ -104,6 +104,9 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
         //Constructor
         privateConstructor = false;
         contracts.addMember((ConstructorDeclaration) this.visit(ctx.body().constructor()));
+
+        //Functions
+        ctx.body().function().forEach(x -> contracts.addMember((MethodDeclaration) this.visit(x)));
 
         return contracts;
     }
