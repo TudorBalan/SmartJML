@@ -1,14 +1,11 @@
-import com.github.javaparser.ast.stmt.BlockStmt;
-import com.github.javaparser.ast.stmt.ExpressionStmt;
-import com.github.javaparser.ast.stmt.Statement;
 import parser.*;
 
+import com.github.javaparser.ast.stmt.*;
 import com.github.javaparser.ast.type.*;
 import com.github.javaparser.ast.body.*;
 import com.github.javaparser.ast.expr.*;
 import com.github.javaparser.ast.*;
 
-import java.util.List;
 import java.util.stream.Collectors;
 
 
@@ -44,11 +41,33 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
         modifiers.add(Modifier.finalModifier());
 
         //The name is changed to SL_"name"
-        String name = "SL_" + ((SimpleName) this.visit(ctx.id())).asString();
+        String name = "SL_" + this.visit(ctx.id()).toString();
+        constructorName = name;
 
         ClassOrInterfaceDeclaration datatypes = new ClassOrInterfaceDeclaration(modifiers, false, name);
 
+        //Fields
+
+        //Constructor
+        datatypes.addMember((ConstructorDeclaration) this.visit(ctx.dataTypeConstr()));
+
         return datatypes;
+    }
+
+    @Override
+    public Node visitDataTypeConstr(SmartMLParser.DataTypeConstrContext ctx){
+        //Class modifiers
+        NodeList<Modifier> modifiers = new NodeList<>();
+        modifiers.add(Modifier.publicModifier());
+        ConstructorDeclaration constructor = new ConstructorDeclaration(modifiers, constructorName);
+
+        //Parameters and Body
+        NodeList<Parameter> parameters= new NodeList<>();
+        BlockStmt body = new BlockStmt();
+        constructor.setParameters(parameters);
+        constructor.setBody(body);
+
+        return constructor;
     }
 
     /*------------------------------------------------------------------
@@ -60,7 +79,7 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
         NodeList<Modifier> modifiers = new NodeList<>();
 
         //The name is changed to SL_"name"
-        String name = "SL_" + ((SimpleName) this.visit(ctx.id())).asString();
+        String name = "SL_" + this.visit(ctx.id()).toString();
         constructorName = name;
 
         ClassOrInterfaceDeclaration resources = new ClassOrInterfaceDeclaration(modifiers, false, name);
@@ -90,7 +109,7 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
         NodeList<Modifier> modifiers = new NodeList<>();
 
         //The name is changed to SL_"name"
-        String name = "SL_" + ((SimpleName) this.visit(ctx.contractId)).asString();
+        String name = "SL_" + this.visit(ctx.contractId).toString();
         constructorName = name;
 
         ClassOrInterfaceDeclaration contracts = new ClassOrInterfaceDeclaration(modifiers, false, name);
@@ -127,18 +146,16 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
         //Body
         BlockStmt body = new BlockStmt();
         ctx.assign().forEach(x -> {
-            AssignExpr expr = (AssignExpr) this.visit(x);
-            body.addStatement(new ExpressionStmt(expr));
+            body.addStatement((Statement) this.visit(x));
         });
         constructor.setBody(body);
 
         return constructor;
     }
 
-
     @Override
     public Node visitTypeParams(SmartMLParser.TypeParamsContext ctx) {
-        return new Parameter((Type) this.visit(ctx.type()), (this.visit(ctx.id())).toString());
+        return visitChildren(ctx);
     }
 
     @Override
@@ -171,25 +188,140 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
 
     @Override
     public Node visitFunction(SmartMLParser.FunctionContext ctx) {
-        return this.visit(ctx.functionDec());
+        MethodDeclaration function = (MethodDeclaration) this.visit(ctx.functionDec());
+        function.setBody((BlockStmt) this.visit(ctx.statBlock()));
+        return function;
+    }
+
+    @Override
+    public Node visitStatement(SmartMLParser.StatementContext ctx) {
+        if (ctx.assign() != null) {
+            return this.visit(ctx.assign());
+        } else if (ctx.assertError() != null) {
+            return this.visit(ctx.assertError());
+        }
+        return visitChildren(ctx);
+    }
+
+    @Override
+    public Node visitIfStatement(SmartMLParser.IfStatementContext ctx) {
+        if (ctx.elseBlock != null) {
+            return new IfStmt((Expression) this.visit(ctx.cond), (Statement) this.visit(ctx.block), (Statement) this.visit(ctx.elseBlock));
+        } else {
+            return new IfStmt((Expression) this.visit(ctx.cond), (Statement) this.visit(ctx.block), null);
+        }
+    }
+
+    @Override
+    public Node visitExprStat(SmartMLParser.ExprStatContext ctx) {
+        return new ExpressionStmt((Expression) this.visit(ctx.expr()));
+    }
+
+    @Override
+    public Node visitLoop(SmartMLParser.LoopContext ctx) {
+        Expression cond = (Expression) this.visit(ctx.expr());
+        System.out.println("cond: " + cond);
+        return new WhileStmt((Expression) this.visit(ctx.expr()), (Statement) this.visit(ctx.statBlock()));
     }
 
     @Override
     public Node visitAssign(SmartMLParser.AssignContext ctx) {
-        return new AssignExpr(new NameExpr(this.visit(ctx.vardec().id()).toString()), new NameExpr(this.visit(ctx.expr().left.left.left.id()).toString()), AssignExpr.Operator.ASSIGN);
+        return new ExpressionStmt(new AssignExpr((Expression) this.visit(ctx.vardec()), (Expression) this.visit(ctx.expr()), AssignExpr.Operator.ASSIGN));
+    }
+
+    @Override
+    public Node visitAssertError(SmartMLParser.AssertErrorContext ctx) {
+        return new AssertStmt((Expression) this.visit(ctx.expr()));
+    }
+
+    @Override
+    public Node visitReturnStat(SmartMLParser.ReturnStatContext ctx) {
+        return new ReturnStmt((Expression) this.visit(ctx.expr()));
+    }
+
+    @Override
+    public Node visitStatBlock(SmartMLParser.StatBlockContext ctx) {
+        BlockStmt block = new BlockStmt();
+        ctx.statement().forEach(x -> block.addStatement((Statement) this.visit(x)));
+        return block;
+    }
+
+    @Override
+    public Node visitExpr(SmartMLParser.ExprContext ctx) {
+        if (ctx.operator == null){
+            return this.visit(ctx.left);
+        } else {
+            BinaryExpr.Operator op;
+            switch (ctx.operator.getText()){
+                case "+": op = BinaryExpr.Operator.PLUS; break;
+                case "-": op = BinaryExpr.Operator.MINUS; break;
+                case "||": op = BinaryExpr.Operator.OR; break;
+                case "=": return new AssignExpr((Expression) this.visit(ctx.left), (Expression) this.visit(ctx.right), AssignExpr.Operator.ASSIGN);
+                default: op = BinaryExpr.Operator.UNSIGNED_RIGHT_SHIFT;
+            }
+            return new BinaryExpr((Expression) this.visit(ctx.left), (Expression) this.visit(ctx.right), op);
+        }
+    }
+
+    @Override
+    public Node visitTerm(SmartMLParser.TermContext ctx) {
+        if (ctx.operator == null){
+            return this.visit(ctx.left);
+        } else {
+            BinaryExpr.Operator op;
+            switch (ctx.operator.getText()){
+                case "*": op = BinaryExpr.Operator.MULTIPLY; break;
+                case "/": op = BinaryExpr.Operator.DIVIDE; break;
+                case "&&": op = BinaryExpr.Operator.AND; break;
+                default: op = BinaryExpr.Operator.UNSIGNED_RIGHT_SHIFT;
+            }
+            return new BinaryExpr((Expression) this.visit(ctx.left), (Expression) this.visit(ctx.right), op);
+        }
+    }
+
+    @Override
+    public Node visitFactor(SmartMLParser.FactorContext ctx) {
+        if (ctx.operator == null){
+            return this.visit(ctx.left);
+        } else {
+            BinaryExpr.Operator op;
+            switch (ctx.operator.getText()){
+                case "==": op = BinaryExpr.Operator.EQUALS; break;
+                case "<": op = BinaryExpr.Operator.LESS; break;
+                case ">": op = BinaryExpr.Operator.GREATER; break;
+                case "<=": op = BinaryExpr.Operator.LESS_EQUALS; break;
+                case ">=": op = BinaryExpr.Operator.GREATER_EQUALS; break;
+                case "!=": op = BinaryExpr.Operator.NOT_EQUALS; break;
+                default: op = BinaryExpr.Operator.UNSIGNED_RIGHT_SHIFT;
+            }
+            return new BinaryExpr((Expression) this.visit(ctx.left), (Expression) this.visit(ctx.right), op);
+        }
+    }
+
+    @Override
+    public Node visitValue(SmartMLParser.ValueContext ctx) {
+        if (ctx.INTEGER() != null){
+            return new IntegerLiteralExpr(ctx.INTEGER().getText());
+        } else if (ctx.expr() != null){
+            return this.visit(ctx.expr());
+        } else {
+            return visitChildren(ctx);
+        }
     }
 
     @Override
     public Node visitVardec(SmartMLParser.VardecContext ctx) {
-        if (ctx.type() != null)
-            return new VariableDeclarator((Type) this.visit(ctx.type()), (this.visit(ctx.id())).toString());
-        else
-            return new NameExpr((SimpleName) visit(ctx.id()));
+        if (ctx.type() != null) {
+            return new VariableDeclarationExpr((Type) this.visit(ctx.type()), (this.visit(ctx.id())).toString());
+        }
+        else {
+            return this.visit(ctx.id());
+        }
     }
 
     @Override
     public Node visitId(SmartMLParser.IdContext ctx){
-        return new SimpleName(ctx.getText());
+        return new NameExpr(new SimpleName(ctx.getText()));
     }
 
     @Override
@@ -220,6 +352,20 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
             default:
                 return new ClassOrInterfaceType(null, "SL_" + ctx.getText());
         }
+    }
+
+    @Override
+    public Node visitBool(SmartMLParser.BoolContext ctx) {
+        if (ctx.getText().equals("true")) {
+            return new BooleanLiteralExpr(true);
+        } else {
+            return new BooleanLiteralExpr(false);
+        }
+    }
+
+    @Override
+    public Node visitString(SmartMLParser.StringContext ctx) {
+        return new StringLiteralExpr(ctx.getText().replaceAll("\"" ,"").replaceAll("'", ""));
     }
 
 }

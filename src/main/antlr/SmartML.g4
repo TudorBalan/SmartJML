@@ -137,7 +137,7 @@ statement
     ;
 
 ifStatement
-    : IF LPAR cond+=expr RPAR blocks+=statBlock (ELSE elseBlock=statBlock)?
+    : IF LPAR cond=expr RPAR block=statBlock (ELSE elseBlock=statBlock)?
     ;
 
 exprStat
