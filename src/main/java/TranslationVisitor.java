@@ -119,6 +119,7 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
             VariableDeclarator vars = (VariableDeclarator) this.visit(x);
             contracts.addMember(new FieldDeclaration(modifiers, vars));
         });
+        contracts.addMember(new FieldDeclaration(modifiers, new VariableDeclarator(new ClassOrInterfaceType("Address"), "address", new ObjectCreationExpr(null, new ClassOrInterfaceType("Address"), new NodeList<>()))));
 
         //Constructor
         privateConstructor = false;
@@ -199,8 +200,11 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
             return this.visit(ctx.assign());
         } else if (ctx.assertError() != null) {
             return this.visit(ctx.assertError());
+        } else if (ctx.funCall() != null) {
+            return this.visit(ctx.funCall());
+        } else {
+            return visitChildren(ctx);
         }
-        return visitChildren(ctx);
     }
 
     @Override
@@ -227,6 +231,37 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
     @Override
     public Node visitAssign(SmartMLParser.AssignContext ctx) {
         return new ExpressionStmt(new AssignExpr((Expression) this.visit(ctx.vardec()), (Expression) this.visit(ctx.expr()), AssignExpr.Operator.ASSIGN));
+    }
+
+    @Override
+    public Node visitInternalCall(SmartMLParser.InternalCallContext ctx) {
+        if (ctx.params() != null) {
+            NodeList<Expression> parameters = new NodeList<>();
+            ctx.params().expr().forEach(x -> parameters.add((Expression) this.visit(x)));
+            return new ExpressionStmt(new MethodCallExpr(new ThisExpr(), this.visit(ctx.id()).toString(), parameters));
+        } else {
+            return new ExpressionStmt(new MethodCallExpr(new ThisExpr(), this.visit(ctx.id()).toString()));
+        }
+    }
+
+    @Override
+    public Node visitExternalCall(SmartMLParser.ExternalCallContext ctx) {
+        NodeList<Expression> parameters = new NodeList<>();
+        if (ctx.resources() != null) {
+            parameters.add((Expression) this.visit(ctx.resources()));
+            parameters.add((Expression) this.visit(ctx.idName));
+            parameters.add(new NameExpr("address"));
+        }
+        if (ctx.params() != null) {
+            ctx.params().expr().forEach(x -> parameters.add((Expression) this.visit(x)));
+            return new ExpressionStmt(new MethodCallExpr((Expression) this.visit(ctx.idName), this.visit(ctx.funName).toString(), parameters));
+        } else {
+            if (ctx.resources() != null) {
+                return new ExpressionStmt(new MethodCallExpr((Expression) this.visit(ctx.idName), this.visit(ctx.funName).toString(), parameters));
+            } else {
+                return new ExpressionStmt(new MethodCallExpr((Expression) this.visit(ctx.idName), this.visit(ctx.funName).toString()));
+            }
+        }
     }
 
     @Override
