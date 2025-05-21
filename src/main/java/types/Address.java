@@ -10,4 +10,8 @@ public class Address {
         this.sl_address = address;
     }
 
+    public Address(){
+        this.sl_address = 0;
+    }
+
 }

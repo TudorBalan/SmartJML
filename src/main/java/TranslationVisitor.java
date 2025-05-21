@@ -7,7 +7,6 @@ import com.github.javaparser.ast.expr.*;
 import com.github.javaparser.ast.*;
 
 import java.util.stream.Collectors;
-import java.util.Random;
 
 public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
 
@@ -242,10 +241,7 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
             NodeList<Expression> parameters = new NodeList<>();
             parameters.add(new IntegerLiteralExpr(0));
             parameters.add(new ObjectCreationExpr(null, new ClassOrInterfaceType("CoinInfo"), new NodeList<>()));
-            Random rand = new Random();
-            NodeList params = new NodeList();
-            params.add(new IntegerLiteralExpr(rand.nextInt(Integer.MAX_VALUE)));
-            parameters.add(new ObjectCreationExpr(null, new ClassOrInterfaceType("Address"), params));
+            parameters.add(new ObjectCreationExpr(null, new ClassOrInterfaceType("Address"), new NodeList<>()));
             ctx.params().expr().forEach(x -> parameters.add((Expression) this.visit(x)));
             return new ExpressionStmt(new MethodCallExpr(new ThisExpr(), this.visit(ctx.id()).toString(), parameters));
         } else {
