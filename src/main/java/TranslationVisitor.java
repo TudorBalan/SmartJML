@@ -7,8 +7,7 @@ import com.github.javaparser.ast.expr.*;
 import com.github.javaparser.ast.*;
 
 import java.util.stream.Collectors;
-
-
+import java.util.Random;
 
 public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
 
@@ -119,6 +118,7 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
             VariableDeclarator vars = (VariableDeclarator) this.visit(x);
             contracts.addMember(new FieldDeclaration(modifiers, vars));
         });
+        //sl_address
         contracts.addMember(new FieldDeclaration(modifiers, new VariableDeclarator(new ClassOrInterfaceType("Address"), "address", new ObjectCreationExpr(null, new ClassOrInterfaceType("Address"), new NodeList<>()))));
 
         //Constructor
@@ -182,6 +182,9 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
 
         //Parameters
         NodeList<Parameter> params = new NodeList<>();
+        params.add(new Parameter(PrimitiveType.intType(), "amount"));
+        params.add(new Parameter(new ClassOrInterfaceType("CoinInfo"), "res"));
+        params.add(new Parameter(new ClassOrInterfaceType("Address"), "address"));
         ctx.vardec().forEach(x -> params.add(new Parameter((Type) this.visit(x.type()), this.visit(x.id()).toString())));
 
         return new MethodDeclaration(modifiers, name, returnType, params);
@@ -237,6 +240,12 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
     public Node visitInternalCall(SmartMLParser.InternalCallContext ctx) {
         if (ctx.params() != null) {
             NodeList<Expression> parameters = new NodeList<>();
+            parameters.add(new IntegerLiteralExpr(0));
+            parameters.add(new ObjectCreationExpr(null, new ClassOrInterfaceType("CoinInfo"), new NodeList<>()));
+            Random rand = new Random();
+            NodeList params = new NodeList();
+            params.add(new IntegerLiteralExpr(rand.nextInt(Integer.MAX_VALUE)));
+            parameters.add(new ObjectCreationExpr(null, new ClassOrInterfaceType("Address"), params));
             ctx.params().expr().forEach(x -> parameters.add((Expression) this.visit(x)));
             return new ExpressionStmt(new MethodCallExpr(new ThisExpr(), this.visit(ctx.id()).toString(), parameters));
         } else {
@@ -250,7 +259,7 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
         if (ctx.resources() != null) {
             parameters.add((Expression) this.visit(ctx.resources()));
             parameters.add((Expression) this.visit(ctx.idName));
-            parameters.add(new NameExpr("address"));
+            parameters.add(new NameExpr("sl_address"));
         }
         if (ctx.params() != null) {
             ctx.params().expr().forEach(x -> parameters.add((Expression) this.visit(x)));
