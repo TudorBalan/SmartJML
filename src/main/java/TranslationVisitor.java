@@ -1,3 +1,4 @@
+import org.checkerframework.checker.units.qual.N;
 import parser.*;
 
 import com.github.javaparser.ast.stmt.*;
@@ -18,15 +19,20 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
      *------------------------------------------------------------------*/
     @Override
     public Node visitProgram(SmartMLParser.ProgramContext ctx) {
+        //Program Parts
         //TODO: add exceptions
         NodeList datatypes = new NodeList(ctx.datatypeDec().stream().map(this::visit).collect(Collectors.toList()));
         NodeList resources = new NodeList(ctx.resourceDec().stream().map(this::visit).collect(Collectors.toList()));
         NodeList contracts = new NodeList(ctx.contractDec().stream().map(this::visit).collect(Collectors.toList()));
-
         datatypes.addAll(resources);
         datatypes.addAll(contracts);
 
-        return new CompilationUnit(null, new NodeList<ImportDeclaration>(), datatypes, null);
+        //Imports
+        NodeList<ImportDeclaration> imports = new NodeList<>();
+        imports.add(new ImportDeclaration("javacard.framework.JCSystem", false, true));
+        imports.add(new ImportDeclaration("types", false, true));
+
+        return new CompilationUnit(null, imports, datatypes, null);
     }
 
     /*------------------------------------------------------------------
@@ -41,7 +47,6 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
         //The name is changed to SL_"name"
         String name = "SL_" + this.visit(ctx.id()).toString();
         constructorName = name;
-
         ClassOrInterfaceDeclaration datatypes = new ClassOrInterfaceDeclaration(modifiers, false, name);
 
         //Fields
@@ -79,7 +84,6 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
         //The name is changed to SL_"name"
         String name = "SL_" + this.visit(ctx.id()).toString();
         constructorName = name;
-
         ClassOrInterfaceDeclaration resources = new ClassOrInterfaceDeclaration(modifiers, false, name);
 
         //Fields
@@ -109,16 +113,15 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
         //The name is changed to SL_"name"
         String name = "SL_" + this.visit(ctx.contractId).toString();
         constructorName = name;
-
-        ClassOrInterfaceDeclaration contracts = new ClassOrInterfaceDeclaration(modifiers, false, name);
+        ClassOrInterfaceDeclaration contracts;
+        contracts = new ClassOrInterfaceDeclaration(modifiers, new NodeList<>(), false, new SimpleName(name), new NodeList<>(), new NodeList<>(new ClassOrInterfaceType("Address")), new NodeList<>(), new NodeList<>(), new NodeList<>());
 
         //Fields
         ctx.body().field().forEach(x -> {
             VariableDeclarator vars = (VariableDeclarator) this.visit(x);
             contracts.addMember(new FieldDeclaration(modifiers, vars));
         });
-        //sl_address
-        contracts.addMember(new FieldDeclaration(modifiers, new VariableDeclarator(new ClassOrInterfaceType("Address"), "address", new ObjectCreationExpr(null, new ClassOrInterfaceType("Address"), new NodeList<>()))));
+        contracts.addMember(new FieldDeclaration(modifiers, new VariableDeclarator(new ClassOrInterfaceType("Address"), "sl_address", new ObjectCreationExpr(null, new ClassOrInterfaceType("Address"), new NodeList<>()))));
 
         //Constructor
         privateConstructor = false;
@@ -176,6 +179,7 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
         } else {
             returnType = new VoidType();
         }
+
         //Name
         String name = this.visit(ctx.id()).toString();
 
@@ -183,7 +187,7 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
         NodeList<Parameter> params = new NodeList<>();
         params.add(new Parameter(PrimitiveType.intType(), "amount"));
         params.add(new Parameter(new ClassOrInterfaceType("CoinInfo"), "res"));
-        params.add(new Parameter(new ClassOrInterfaceType("Address"), "address"));
+        params.add(new Parameter(new ClassOrInterfaceType("Address"), "sender"));
         ctx.vardec().forEach(x -> params.add(new Parameter((Type) this.visit(x.type()), this.visit(x.id()).toString())));
 
         return new MethodDeclaration(modifiers, name, returnType, params);
@@ -238,11 +242,13 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
     @Override
     public Node visitInternalCall(SmartMLParser.InternalCallContext ctx) {
         if (ctx.params() != null) {
+            //Parameters
             NodeList<Expression> parameters = new NodeList<>();
             parameters.add(new IntegerLiteralExpr(0));
             parameters.add(new ObjectCreationExpr(null, new ClassOrInterfaceType("CoinInfo"), new NodeList<>()));
             parameters.add(new ObjectCreationExpr(null, new ClassOrInterfaceType("Address"), new NodeList<>()));
             ctx.params().expr().forEach(x -> parameters.add((Expression) this.visit(x)));
+
             return new ExpressionStmt(new MethodCallExpr(new ThisExpr(), this.visit(ctx.id()).toString(), parameters));
         } else {
             return new ExpressionStmt(new MethodCallExpr(new ThisExpr(), this.visit(ctx.id()).toString()));
@@ -251,27 +257,48 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
 
     @Override
     public Node visitExternalCall(SmartMLParser.ExternalCallContext ctx) {
+        //Parameters
         NodeList<Expression> parameters = new NodeList<>();
         if (ctx.resources() != null) {
             parameters.add((Expression) this.visit(ctx.resources()));
             parameters.add((Expression) this.visit(ctx.idName));
             parameters.add(new NameExpr("sl_address"));
+        } else {
+            parameters.add(new IntegerLiteralExpr(0));
+            parameters.add(new ObjectCreationExpr(null, new ClassOrInterfaceType("CoinInfo"), new NodeList<>()));
+            parameters.add(new NameExpr("sl_address"));
         }
         if (ctx.params() != null) {
             ctx.params().expr().forEach(x -> parameters.add((Expression) this.visit(x)));
-            return new ExpressionStmt(new MethodCallExpr((Expression) this.visit(ctx.idName), this.visit(ctx.funName).toString(), parameters));
-        } else {
-            if (ctx.resources() != null) {
-                return new ExpressionStmt(new MethodCallExpr((Expression) this.visit(ctx.idName), this.visit(ctx.funName).toString(), parameters));
-            } else {
-                return new ExpressionStmt(new MethodCallExpr((Expression) this.visit(ctx.idName), this.visit(ctx.funName).toString()));
-            }
         }
+
+        return new ExpressionStmt(new MethodCallExpr((Expression) this.visit(ctx.idName), this.visit(ctx.funName).toString(), parameters));
     }
 
     @Override
     public Node visitAssertError(SmartMLParser.AssertErrorContext ctx) {
         return new AssertStmt((Expression) this.visit(ctx.expr()));
+    }
+
+    @Override
+    public Node visitTransaction(SmartMLParser.TransactionContext ctx) {
+        //Try Block
+        BlockStmt beginTransaction = new BlockStmt(new NodeList<>(new ExpressionStmt(new MethodCallExpr(new NameExpr("JCSystem"), "beginTransaction"))));
+        Statement condition = (Statement) this.visit(ctx.statement());
+        beginTransaction.addStatement(condition);
+
+        //Success Block
+        BlockStmt commitTransaction = new BlockStmt(new NodeList<>(new ExpressionStmt(new MethodCallExpr(new NameExpr("JCSystem"), "commitTransaction"))));
+        BlockStmt success = (BlockStmt) this.visit(ctx.successStat);
+        commitTransaction.addStatement(success);
+        beginTransaction.addStatement(commitTransaction);
+
+        //Abort Block
+        BlockStmt abortTransaction = new BlockStmt(new NodeList<>(new ExpressionStmt(new MethodCallExpr(new NameExpr("JCSystem"), "abortTransaction"))));
+        BlockStmt failure = (BlockStmt) this.visit(ctx.abortStat);
+        abortTransaction.addStatement(failure);
+
+        return new TryStmt(beginTransaction, new NodeList<>(new CatchClause(new NodeList<>(), new NodeList<>(), new ClassOrInterfaceType("Exception"), new SimpleName("sl_e"),abortTransaction)), null);
     }
 
     @Override
