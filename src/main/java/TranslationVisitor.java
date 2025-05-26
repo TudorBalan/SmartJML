@@ -22,8 +22,10 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
         //Program Parts
         //TODO: add exceptions
         NodeList datatypes = new NodeList(ctx.datatypeDec().stream().map(this::visit).collect(Collectors.toList()));
+        NodeList exceptions = new NodeList(ctx.exceptionDec().stream().map(this::visit).collect(Collectors.toList()));
         NodeList resources = new NodeList(ctx.resourceDec().stream().map(this::visit).collect(Collectors.toList()));
         NodeList contracts = new NodeList(ctx.contractDec().stream().map(this::visit).collect(Collectors.toList()));
+        datatypes.addAll(exceptions);
         datatypes.addAll(resources);
         datatypes.addAll(contracts);
 
@@ -59,7 +61,7 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
 
     @Override
     public Node visitDataTypeConstr(SmartMLParser.DataTypeConstrContext ctx){
-        //Class modifiers
+        //Constructor modifiers
         NodeList<Modifier> modifiers = new NodeList<>();
         modifiers.add(Modifier.publicModifier());
         ConstructorDeclaration constructor = new ConstructorDeclaration(modifiers, constructorName);
@@ -71,6 +73,26 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
         constructor.setBody(body);
 
         return constructor;
+    }
+
+    /*------------------------------------------------------------------
+     * EXCEPTIONS
+     *------------------------------------------------------------------*/
+    @Override
+    public Node visitExceptionDec(SmartMLParser.ExceptionDecContext ctx) {
+        //Class modifiers
+        NodeList<Modifier> modifiers = new NodeList<>();
+
+        //The name is changed to SL_"name"
+        String name = "SL_" + ctx.ID().getText();
+        ClassOrInterfaceDeclaration exceptions = new ClassOrInterfaceDeclaration(modifiers, new NodeList<>(), false, new SimpleName(name), new NodeList<>(), new NodeList<>(new ClassOrInterfaceType("Exception")), new NodeList<>(), new NodeList<>(), new NodeList<>());
+
+        //Constructor
+        ConstructorDeclaration constructor = new ConstructorDeclaration(modifiers, name);
+        constructor.setBody(new BlockStmt(new NodeList<>(new ExpressionStmt(new MethodCallExpr("super")))));
+        exceptions.addMember(constructor);
+
+        return exceptions;
     }
 
     /*------------------------------------------------------------------
