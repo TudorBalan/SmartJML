@@ -1,3 +1,4 @@
+import javassist.expr.Expr;
 import org.checkerframework.checker.units.qual.N;
 import parser.*;
 
@@ -13,6 +14,7 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
 
     String constructorName;
     boolean privateConstructor;
+    boolean switchReturn;
 
     /*------------------------------------------------------------------
      * PROGRAMS
@@ -56,6 +58,9 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
         //Constructor
         datatypes.addMember((ConstructorDeclaration) this.visit(ctx.dataTypeConstr()));
 
+        //Functions
+        ctx.adtFunctionDec().forEach(x -> datatypes.addMember((MethodDeclaration) this.visit(x)));
+
         return datatypes;
     }
 
@@ -73,6 +78,93 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
         constructor.setBody(body);
 
         return constructor;
+    }
+
+    @Override
+    public Node visitAdtFunctionDec(SmartMLParser.AdtFunctionDecContext ctx){
+        //Modifiers
+        NodeList<Modifier> modifiers = new NodeList<>();
+        modifiers.add(Modifier.publicModifier());
+
+        //Return Type
+        Type returnType;
+        if (ctx.type() != null) {
+            returnType = (Type) this.visit(ctx.type());
+        } else {
+            returnType = new VoidType();
+        }
+
+        //Name
+        String name = this.visit(ctx.id()).toString();
+
+        //Parameters
+        NodeList<Parameter> params = new NodeList<>();
+        ctx.vardec().forEach(x -> params.add(new Parameter((Type) this.visit(x.type()), this.visit(x.id()).toString())));
+
+        //Body
+        MethodDeclaration fun =  new MethodDeclaration(modifiers, name, returnType, params);
+        fun.setBody((BlockStmt) this.visit(ctx.adtStatBlock()));
+
+        return fun;
+    }
+
+    @Override
+    public Node visitAdtStatBlock(SmartMLParser.AdtStatBlockContext ctx){
+        NodeList<Statement> statements = new NodeList<>();
+        ctx.adtExpression().forEach(x -> statements.add(((Statement) this.visit(x))));
+        return new BlockStmt(statements);
+    }
+
+    @Override
+    public Node visitAdtExpression(SmartMLParser.AdtExpressionContext ctx){
+        if (ctx.expr() != null) {
+            if (ctx.RETURN() != null) {
+                return new ReturnStmt((Expression) this.visit(ctx.expr()));
+            } else {
+                return this.visit(ctx.expr());
+            }
+        } else if (ctx.switchExpr() != null) {
+            switchReturn = ctx.RETURN() != null;
+            return this.visit(ctx.switchExpr());
+        } else if (ctx.adtCall() != null) {
+            if (ctx.RETURN() != null) {
+                return new ReturnStmt((Expression) this.visit(ctx.adtCall()));
+            } else {
+                return this.visit(ctx.adtCall());
+            }
+        } else if (ctx.adtAssign() != null) {
+            return this.visit(ctx.adtAssign());
+        } else {
+            return visitChildren(ctx);
+        }
+    }
+
+    @Override
+    public Node visitIfExpression(SmartMLParser.IfExpressionContext ctx) {
+        return new IfStmt((Expression) this.visit(ctx.expr()), (Statement) this.visit(ctx.ifblock), (Statement) this.visit(ctx.elseblock));
+    }
+
+    @Override
+    public Node visitAdtCall(SmartMLParser.AdtCallContext ctx) {
+        if (ctx.params() != null) {
+            NodeList<Expression> parameters = new NodeList<>();
+            ctx.params().expr().forEach(x -> parameters.add((Expression) this.visit(x)));
+            return new MethodCallExpr(new ThisExpr(), this.visit(ctx.id()).toString(), parameters);
+        } else {
+            return new MethodCallExpr(new ThisExpr(), this.visit(ctx.id()).toString());
+        }
+    }
+
+    @Override
+    public Node visitSwitchExpr(SmartMLParser.SwitchExprContext ctx) {
+        //TODO:
+        return visitChildren(ctx);
+    }
+
+    @Override
+    public Node visitAdtAssign(SmartMLParser.AdtAssignContext ctx){
+        //TODO: Add Datatype Call
+        return new ExpressionStmt(new AssignExpr((Expression) this.visit(ctx.vardec()), (Expression) this.visit(ctx.expr()), AssignExpr.Operator.ASSIGN));
     }
 
     /*------------------------------------------------------------------
@@ -263,18 +355,14 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
 
     @Override
     public Node visitInternalCall(SmartMLParser.InternalCallContext ctx) {
+        NodeList<Expression> parameters = new NodeList<>();
+        parameters.add(new IntegerLiteralExpr(0));
+        parameters.add(new ObjectCreationExpr(null, new ClassOrInterfaceType("CoinInfo"), new NodeList<>()));
+        parameters.add(new ObjectCreationExpr(null, new ClassOrInterfaceType("Address"), new NodeList<>()));
         if (ctx.params() != null) {
-            //Parameters
-            NodeList<Expression> parameters = new NodeList<>();
-            parameters.add(new IntegerLiteralExpr(0));
-            parameters.add(new ObjectCreationExpr(null, new ClassOrInterfaceType("CoinInfo"), new NodeList<>()));
-            parameters.add(new ObjectCreationExpr(null, new ClassOrInterfaceType("Address"), new NodeList<>()));
             ctx.params().expr().forEach(x -> parameters.add((Expression) this.visit(x)));
-
-            return new ExpressionStmt(new MethodCallExpr(new ThisExpr(), this.visit(ctx.id()).toString(), parameters));
-        } else {
-            return new ExpressionStmt(new MethodCallExpr(new ThisExpr(), this.visit(ctx.id()).toString()));
         }
+        return new ExpressionStmt(new MethodCallExpr(new ThisExpr(), this.visit(ctx.id()).toString(), parameters));
     }
 
     @Override

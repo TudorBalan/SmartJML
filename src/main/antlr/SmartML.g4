@@ -48,7 +48,7 @@ dataTypeCall
     ;
 
 ifExpression
-    : IF expr adtStatBlock ELSE adtStatBlock
+    : IF expr ifblock=adtStatBlock ELSE elseblock=adtStatBlock
     ;
 
 adtCall
