@@ -7,7 +7,9 @@ import com.github.javaparser.ast.type.*;
 import com.github.javaparser.ast.body.*;
 import com.github.javaparser.ast.expr.*;
 import com.github.javaparser.ast.*;
+import types.Address;
 
+import java.util.Map;
 import java.util.stream.Collectors;
 
 public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
@@ -409,16 +411,19 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
         if (ctx.resources() != null) {
             parameters.add((Expression) this.visit(ctx.resources()));
             parameters.add((Expression) this.visit(ctx.idName));
-            parameters.add(new NameExpr("sl_address"));
+            parameters.add(new ThisExpr());
         } else {
             parameters.add(new IntegerLiteralExpr(0));
             parameters.add(new ObjectCreationExpr(null, new ClassOrInterfaceType("CoinInfo"), new NodeList<>()));
-            parameters.add(new NameExpr("sl_address"));
+            parameters.add(new ThisExpr());
         }
         if (ctx.params() != null) {
             ctx.params().expr().forEach(x -> parameters.add((Expression) this.visit(x)));
         }
-
+        if (this.visit(ctx.idName).toString().equals("sender")) {
+            //TODO: Make this applicable for more than 1 class
+            return new ExpressionStmt(new MethodCallExpr(new EnclosedExpr(new CastExpr(new ClassOrInterfaceType(null, constructorName), (Expression) this.visit(ctx.idName))), this.visit(ctx.funName).toString(), parameters));
+        }
         return new ExpressionStmt(new MethodCallExpr((Expression) this.visit(ctx.idName), this.visit(ctx.funName).toString(), parameters));
     }
 
