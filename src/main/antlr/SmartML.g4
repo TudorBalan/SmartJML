@@ -60,8 +60,8 @@ switchExpr
     ;
 
 caseExpr
-    : (CASE (valuesCase+=adtExpression) COLON (blockCase+=adtExpression)* SEMIC?)*
-      (DEFAULT COLON (defaultCase+=adtExpression)* SEMIC?)
+    : (CASE (valuesCase=adtExpression) COLON (blockCase=adtExpression)* SEMIC?)*
+      (DEFAULT COLON (defaultCase=adtExpression)* SEMIC?)
     ;
 
 adtAssign

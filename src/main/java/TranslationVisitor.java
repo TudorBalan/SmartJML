@@ -14,7 +14,6 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
 
     String constructorName;
     boolean privateConstructor;
-    boolean switchReturn;
 
     /*------------------------------------------------------------------
      * PROGRAMS
@@ -22,7 +21,6 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
     @Override
     public Node visitProgram(SmartMLParser.ProgramContext ctx) {
         //Program Parts
-        //TODO: add exceptions
         NodeList datatypes = new NodeList(ctx.datatypeDec().stream().map(this::visit).collect(Collectors.toList()));
         NodeList exceptions = new NodeList(ctx.exceptionDec().stream().map(this::visit).collect(Collectors.toList()));
         NodeList resources = new NodeList(ctx.resourceDec().stream().map(this::visit).collect(Collectors.toList()));
@@ -121,21 +119,36 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
             if (ctx.RETURN() != null) {
                 return new ReturnStmt((Expression) this.visit(ctx.expr()));
             } else {
-                return this.visit(ctx.expr());
+                return new ExpressionStmt((Expression) this.visit(ctx.expr()));
             }
         } else if (ctx.switchExpr() != null) {
-            switchReturn = ctx.RETURN() != null;
-            return this.visit(ctx.switchExpr());
+            if (ctx.RETURN() != null) {
+                return new ReturnStmt((Expression) this.visit(ctx.switchExpr()));
+            } else {
+                return new ExpressionStmt((Expression) this.visit(ctx.switchExpr()));
+            }
         } else if (ctx.adtCall() != null) {
             if (ctx.RETURN() != null) {
                 return new ReturnStmt((Expression) this.visit(ctx.adtCall()));
             } else {
-                return this.visit(ctx.adtCall());
+                return new ExpressionStmt((Expression) this.visit(ctx.adtCall()));
             }
         } else if (ctx.adtAssign() != null) {
             return this.visit(ctx.adtAssign());
         } else {
             return visitChildren(ctx);
+        }
+    }
+
+    @Override
+    public Node visitDataTypeCall(SmartMLParser.DataTypeCallContext ctx){
+        //TODO: Once fields work, add funcionality to call fields like 'l.tail'
+        if (ctx.vardec() != null) {
+            NodeList<Expression> parameters = new NodeList<>();
+            ctx.vardec().forEach(x -> parameters.add((Expression) this.visit(x)));
+            return new MethodCallExpr(new ThisExpr(), this.visit(ctx.id()).toString(), parameters);
+        } else {
+            return new MethodCallExpr(new ThisExpr(), this.visit(ctx.id()).toString());
         }
     }
 
@@ -149,22 +162,46 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
         if (ctx.params() != null) {
             NodeList<Expression> parameters = new NodeList<>();
             ctx.params().expr().forEach(x -> parameters.add((Expression) this.visit(x)));
-            return new MethodCallExpr(new ThisExpr(), this.visit(ctx.id()).toString(), parameters);
+            return new ObjectCreationExpr(null, new ClassOrInterfaceType(constructorName), parameters);
         } else {
-            return new MethodCallExpr(new ThisExpr(), this.visit(ctx.id()).toString());
+            return new ObjectCreationExpr(null, new ClassOrInterfaceType(constructorName), null);
         }
     }
 
+    //TODO: Implement default case in either this or the next method
     @Override
     public Node visitSwitchExpr(SmartMLParser.SwitchExprContext ctx) {
-        //TODO:
-        return visitChildren(ctx);
+        NodeList<SwitchEntry> entries = new NodeList<>();
+        ctx.caseExpr().forEach(x -> entries.add((SwitchEntry) this.visit(x)));
+        return new SwitchExpr((Expression) this.visit(ctx.expr()), entries);
+    }
+
+    @Override
+    public Node visitCaseExpr(SmartMLParser.CaseExprContext ctx) {
+        Expression expr;
+        if (ctx.valuesCase.expr() != null) {
+            expr = (Expression) this.visit(ctx.valuesCase.expr());
+        } else if (ctx.valuesCase.switchExpr() != null) {
+            expr = (Expression) this.visit(ctx.valuesCase.switchExpr());
+        } else if (ctx.valuesCase.ifExpression() != null) {
+            expr = (Expression) this.visit(ctx.valuesCase.ifExpression());
+        } else if (ctx.valuesCase.adtCall() != null) {
+            expr = (Expression) this.visit(ctx.valuesCase.adtCall());
+        } else  if (ctx.valuesCase.adtAssign() != null) {
+            expr = (Expression) this.visit(ctx.valuesCase.adtAssign());
+        } else {
+            return new SwitchEntry(null, SwitchEntry.Type.STATEMENT_GROUP, new NodeList<>((Statement)this.visit(ctx.defaultCase)));
+        }
+        return new SwitchEntry(new NodeList<>(expr), SwitchEntry.Type.STATEMENT_GROUP, new NodeList<>((Statement) this.visit(ctx.blockCase)));
     }
 
     @Override
     public Node visitAdtAssign(SmartMLParser.AdtAssignContext ctx){
-        //TODO: Add Datatype Call
-        return new ExpressionStmt(new AssignExpr((Expression) this.visit(ctx.vardec()), (Expression) this.visit(ctx.expr()), AssignExpr.Operator.ASSIGN));
+        if (ctx.expr() != null) {
+            return new ExpressionStmt(new AssignExpr((Expression) this.visit(ctx.vardec()), (Expression) this.visit(ctx.expr()), AssignExpr.Operator.ASSIGN));
+        } else {
+            return new ExpressionStmt(new AssignExpr((Expression) this.visit(ctx.vardec()), (Expression) this.visit(ctx.dataTypeCall()), AssignExpr.Operator.ASSIGN));
+        }
     }
 
     /*------------------------------------------------------------------
