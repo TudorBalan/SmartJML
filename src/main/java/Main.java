@@ -14,7 +14,7 @@ public class Main {
 
     public static void main(String[] args) {
         try {
-            CharStream input = CharStreams.fromFileName("src/main/input/testInput.sl");
+            CharStream input = CharStreams.fromFileName("src/main/java/io/input/testInput.sl");
             System.out.println("INPUT:\n" + input);
             SmartMLLexer lexer = new SmartMLLexer(input);
             CommonTokenStream tokens = new CommonTokenStream(lexer);
@@ -25,7 +25,7 @@ public class Main {
 
             TranslationVisitor visitor = new TranslationVisitor();
             Node translation = visitor.visit(tree);
-            Files.write(Paths.get("src/main/output/testOutput.java"), translation.toString().getBytes());
+            Files.write(Paths.get("src/main/java/io/output/testOutput.java"), translation.toString().getBytes());
         } catch (IOException e) {
             System.out.println("ERROR while processing file:" + e.getMessage());
         }

@@ -1,5 +1,7 @@
-import javassist.expr.Expr;
-import org.checkerframework.checker.units.qual.N;
+import com.github.javaparser.ast.jml.body.JmlSpecification;
+import com.github.javaparser.ast.jml.clauses.ContractType;
+import com.github.javaparser.ast.jml.clauses.JmlContract;
+import com.github.javaparser.ast.jml.stmt.JmlGhostStmt;
 import parser.*;
 
 import com.github.javaparser.ast.stmt.*;
@@ -7,9 +9,8 @@ import com.github.javaparser.ast.type.*;
 import com.github.javaparser.ast.body.*;
 import com.github.javaparser.ast.expr.*;
 import com.github.javaparser.ast.*;
-import types.Address;
+import com.github.javaparser.ast.jml.*;
 
-import java.util.Map;
 import java.util.stream.Collectors;
 
 public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
@@ -305,6 +306,9 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
             body.addStatement((Statement) this.visit(x));
         });
         constructor.setBody(body);
+
+        //JML
+        NodeList<SimpleName> test3 = new NodeList<>(new SimpleName("woop"));
 
         return constructor;
     }
