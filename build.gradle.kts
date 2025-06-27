@@ -27,7 +27,9 @@ repositories {
 dependencies {
     api(libs.org.antlr.antlr4.runtime)
     api(libs.com.github.javaparser.javaparser.symbol.solver.core)
-    implementation("io.github.jmltoolkit:jmlparser-symbol-solver-core:3.25.10-b5-SNAPSHOT")
+    implementation("io.github.jmltoolkit:jmlparser-symbol-solver-core:3.25.8-SNAPSHOT")
+    implementation("io.github.jmltoolkit:jmlparser-core:3.25.8-SNAPSHOT")
+
 }
 
 group = "SmartJML"

@@ -1,7 +1,3 @@
-import com.github.javaparser.ast.jml.body.JmlSpecification;
-import com.github.javaparser.ast.jml.clauses.ContractType;
-import com.github.javaparser.ast.jml.clauses.JmlContract;
-import com.github.javaparser.ast.jml.stmt.JmlGhostStmt;
 import parser.*;
 
 import com.github.javaparser.ast.stmt.*;
@@ -9,7 +5,7 @@ import com.github.javaparser.ast.type.*;
 import com.github.javaparser.ast.body.*;
 import com.github.javaparser.ast.expr.*;
 import com.github.javaparser.ast.*;
-import com.github.javaparser.ast.jml.*;
+import com.github.javaparser.ast.jml.body.*;
 
 import java.util.stream.Collectors;
 
@@ -36,6 +32,10 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
         NodeList<ImportDeclaration> imports = new NodeList<>();
         imports.add(new ImportDeclaration("javacard.framework.JCSystem", false, true));
         imports.add(new ImportDeclaration("types", false, true));
+
+        //JML
+        //TODO
+        JmlClassAccessibleDeclaration test = new JmlClassAccessibleDeclaration(new NodeList<>(), new NodeList<>(), new NameExpr("a"), new NodeList<>(), new NameExpr("b"));
 
         return new CompilationUnit(null, imports, datatypes, null);
     }
