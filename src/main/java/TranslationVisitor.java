@@ -34,7 +34,7 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
 
         //Imports
         NodeList<ImportDeclaration> imports = new NodeList<>();
-        imports.add(new ImportDeclaration("javacard.framework.JCSystem", false, true));
+        imports.add(new ImportDeclaration("javacard.framework", false, true));
         imports.add(new ImportDeclaration("types", false, true));
 
         return new CompilationUnit(null, imports, datatypes, null);
@@ -310,7 +310,7 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
         BlockStmt body = new BlockStmt();
         ctx.assign().forEach(x -> {
             body.addStatement((Statement) this.visit(x));
-            clauses.add(new JmlSimpleExprClause(JmlClauseKind.ENSURES, new SimpleName(" "), new NodeList<>(), new AssignExpr((Expression) this.visit(x.vardec()), (Expression) this.visit(x.expr()), AssignExpr.Operator.ASSIGN)));
+            clauses.add(new JmlSimpleExprClause(JmlClauseKind.ENSURES, new SimpleName(" "), new NodeList<>(), new BinaryExpr((Expression) this.visit(x.vardec()), (Expression) this.visit(x.expr()), BinaryExpr.Operator.EQUALS)));
         });
         constructor.setBody(body);
 

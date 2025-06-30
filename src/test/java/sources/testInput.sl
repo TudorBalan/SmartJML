@@ -1,5 +1,3 @@
-exception funnyException(string s)
-
 contract Notifier {
     int truth;
     address addressToNotify;
@@ -9,13 +7,13 @@ contract Notifier {
         addressToNotify = _addressToNotify;
     }
 
-    checkMessage() returns string {
+    checkMessage() returns int {
         while (truth > 42) {
             truth = truth - 2;
             if (truth == 42) {
-                return 'Rumpelstilzchen';
+                return 0;
             } else {
-                return "Struwwelpeter";
+                return 1;
             }
         }
     }
