@@ -1,3 +1,4 @@
+import com.github.javaparser.ast.comments.BlockComment;
 import parser.*;
 
 import com.github.javaparser.ast.stmt.*;
@@ -6,6 +7,9 @@ import com.github.javaparser.ast.body.*;
 import com.github.javaparser.ast.expr.*;
 import com.github.javaparser.ast.*;
 import com.github.javaparser.ast.jml.body.*;
+import com.github.javaparser.ast.jml.*;
+import com.github.javaparser.ast.jml.clauses.*;
+import com.github.javaparser.ast.jml.doc.*;
 
 import java.util.stream.Collectors;
 
@@ -32,10 +36,6 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
         NodeList<ImportDeclaration> imports = new NodeList<>();
         imports.add(new ImportDeclaration("javacard.framework.JCSystem", false, true));
         imports.add(new ImportDeclaration("types", false, true));
-
-        //JML
-        //TODO
-        JmlClassAccessibleDeclaration test = new JmlClassAccessibleDeclaration(new NodeList<>(), new NodeList<>(), new NameExpr("a"), new NodeList<>(), new NameExpr("b"));
 
         return new CompilationUnit(null, imports, datatypes, null);
     }
@@ -300,15 +300,22 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
         ctx.varParams.forEach(x -> parameters.add(new Parameter((Type) this.visit(x.type()), this.visit(x.id()).toString())));
         constructor.setParameters(parameters);
 
+        //JML Specification
+        JmlContract jmlSpec = new JmlContract();
+        jmlSpec.setBehavior(Behavior.NORMAL);
+        jmlSpec.setModifiers(new NodeList<>(Modifier.publicModifier()));
+        NodeList<JmlClause> clauses = new NodeList<>();
+
         //Body
         BlockStmt body = new BlockStmt();
         ctx.assign().forEach(x -> {
             body.addStatement((Statement) this.visit(x));
+            clauses.add(new JmlSimpleExprClause(JmlClauseKind.ENSURES, new SimpleName(" "), new NodeList<>(), new AssignExpr((Expression) this.visit(x.vardec()), (Expression) this.visit(x.expr()), AssignExpr.Operator.ASSIGN)));
         });
         constructor.setBody(body);
 
-        //JML
-        NodeList<SimpleName> test3 = new NodeList<>(new SimpleName("woop"));
+        jmlSpec.setClauses(clauses);
+        constructor.setComment(new BlockComment("@ " + jmlSpec));
 
         return constructor;
     }
