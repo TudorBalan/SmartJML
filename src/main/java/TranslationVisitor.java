@@ -55,6 +55,7 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
         ClassOrInterfaceDeclaration datatypes = new ClassOrInterfaceDeclaration(modifiers, false, name);
 
         //Fields
+        //TODO: Add field translation for ADTs
 
         //Constructor
         datatypes.addMember((ConstructorDeclaration) this.visit(ctx.dataTypeConstr()));
@@ -292,6 +293,7 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
     public Node visitConstructor(SmartMLParser.ConstructorContext ctx) {
         //Constructor Declaration
         NodeList<Modifier> modifiers = new NodeList<>();
+        //TODO: Method for singleton functionality
         if (privateConstructor) modifiers.add(Modifier.privateModifier()); else modifiers.add(Modifier.publicModifier());
         ConstructorDeclaration constructor = new ConstructorDeclaration(modifiers, constructorName);
 
@@ -576,7 +578,7 @@ public class TranslationVisitor extends SmartMLBaseVisitor<Node> {
             case "bool":
                 return PrimitiveType.booleanType();
             case "string":
-                return new ClassOrInterfaceType(null, "String");
+                return new ArrayType(PrimitiveType.byteType());
             case "int":
                 return PrimitiveType.intType();
             default:
