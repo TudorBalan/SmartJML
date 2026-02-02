@@ -1,6 +1,6 @@
 # SmartJML
 
-A SmartML to Java Card and SmartJML to JML translator.
+This repository houses a SmartML to Java Card and SmartJML to JML translator.
 
 A valid .sl file will automatically be translated to a valid .java file after being put into the /sources/ directory and running the main method located within Main.java.
 
